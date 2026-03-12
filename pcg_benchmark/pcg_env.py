@@ -49,6 +49,9 @@ class PCGEnv:
     Parameters:
         name(str): the string name that defines the current problem
         problem(Problem): a subclass of Problem that need to be solved
+￼
+번역 결과
+
     """
     def __init__(self, name, problem):
         self._name = name
@@ -309,3 +312,31 @@ class PCGEnv:
         if single_input:
             return result[0]
         return result
+
+    def llmscore(self, infos, map_names=None):
+        if isinstance(infos, dict):
+            infos = [infos]
+            is_array = False
+        else:
+            is_array = True
+
+        if map_names is None:
+            map_names = [f"map_{idx:03d}" for idx in range(len(infos))]
+
+        scores = []
+        clears = []
+        for i, name in zip(infos, map_names):
+            result = self._problem.llmscore(i, map_name=name)
+            if isinstance(result, tuple):
+                score, is_clear = result
+            else:
+                score, is_clear = result, False
+            scores.append(score)
+            clears.append(is_clear)
+        scores = np.array(scores, dtype=float)
+        clears = np.array(clears, dtype=bool)
+
+        if not is_array:
+            return bool(clears[0]), scores[0], infos[0]
+        return clears.sum() / len(infos), scores, clears, infos
+

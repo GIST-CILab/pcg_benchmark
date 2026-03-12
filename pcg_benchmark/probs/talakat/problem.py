@@ -5,8 +5,15 @@ from pcg_benchmark.probs.talakat.engine import parameters, generateTalakatScript
 from pcg_benchmark.probs.talakat.engine.helper import calculateBuckets, calculateEntropy
 import numpy as np
 import json
+import math
+import shutil
 from PIL import Image, ImageDraw
 import os
+
+def load_level(filepath):
+    """talakat 레퍼런스 JSON 파일을 직접 로드해서 script dict 반환"""
+    with open(filepath, 'r') as f:
+        return json.load(f)
 
 class TalakatProblem(Problem):
     def __init__(self, **kwargs):
@@ -40,6 +47,13 @@ class TalakatProblem(Problem):
     
     def info(self, content):
         script = generateTalakatScript(content)
+        return self._compute_info(script)
+
+    def info_from_script(self, script):
+        """레퍼런스 JSON script를 직접 평가"""
+        return self._compute_info(script)
+
+    def _compute_info(self, script):
         connections = set()
         nextSpawners = ["spawner_0"]
         while len(nextSpawners) > 0:
@@ -50,16 +64,20 @@ class TalakatProblem(Problem):
                         connections.update([spawned])
                         nextSpawners.append(spawned)
         result = runPattern(script)
-        
-        bullets = np.zeros((self._pattern_sections, parameters["bucketsX"] * parameters["bucketsY"]))
-        num_bullets = [0.0] * self._pattern_sections
+
+        # 실제 결과 길이 기반으로 sections 계산 (레퍼런스 맵이 더 길 수 있음)
+        actual_sections = max(1, math.ceil(len(result) / 30))
+        bullets = np.zeros((actual_sections, parameters["bucketsX"] * parameters["bucketsY"]))
+        num_bullets = [0.0] * actual_sections
         coverage = np.zeros(parameters["bucketsX"] * parameters["bucketsY"])
         for i, (world, _) in enumerate(result):
             temp = np.array(calculateBuckets(self._width, self._height, parameters["bucketsX"], parameters["bucketsY"], world.bullets))
-            bullets[int(i/30)] += temp / max(1, temp.sum())
+            section = min(int(i / 30), actual_sections - 1)
+            bullets[section] += temp / max(1, temp.sum())
             coverage += temp / max(1, temp.sum())
-            num_bullets[int(i/30)] += len(world.bullets)
+            num_bullets[section] += len(world.bullets)
         return {
+            "script": script,
             "script_connectivity": (len(connections) + 1) / self._spawnerComplexity,
             "percentage": len(result) / self._maxHealth,
             "bullets": np.array(num_bullets) / 30,
@@ -134,3 +152,54 @@ class TalakatProblem(Problem):
                                 int(result[i][0].boss.x+bossGfx.width/2), int(result[i][0].boss.y+bossGfx.height/2)), bossGfx)
             images.append(img)
         return images
+
+    def render_solution(self, info, map_name="map"):
+        """JSON script를 받아 render와 동일한 방식으로 프레임을 생성하고 videos/talakat/{map_name}/에 저장"""
+        script = info["script"]
+        is_clear = info.get("percentage", 0.0) >= 1.0
+
+        bossGfx = Image.open(os.path.dirname(__file__) + "/images/boss.png").convert('RGBA')
+        result = runPattern(script)
+
+        frames = []
+        for i in range(0, len(result), self._renderSampling):
+            img = Image.new("RGBA", (parameters["width"], parameters["height"]), (71, 45, 60, 255))
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([0, 0, img.width, img.height], fill=(71, 45, 60, 255))
+            for b in result[i][0].bullets:
+                draw.ellipse(
+                    [b.x - b.radius, b.y - b.radius, b.x + b.radius, b.y + b.radius],
+                    fill=(207, 198, 184, 255), outline=(230, 72, 46, 255), width=2
+                )
+            img.paste(bossGfx,
+                      (int(result[i][0].boss.x - bossGfx.width / 2),
+                       int(result[i][0].boss.y - bossGfx.height / 2),
+                       int(result[i][0].boss.x + bossGfx.width / 2),
+                       int(result[i][0].boss.y + bossGfx.height / 2)), bossGfx)
+            # 플레이어 표시 (흰색 원)
+            p = result[i][0].player
+            draw.ellipse(
+                [p.x - p.radius, p.y - p.radius, p.x + p.radius, p.y + p.radius],
+                fill=(255, 255, 255, 255), outline=(100, 200, 255, 255), width=2
+            )
+            frames.append(img)
+
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        save_dir = os.path.join(project_root, "videos", "talakat", map_name)
+        if os.path.exists(save_dir):
+            shutil.rmtree(save_dir)
+        os.makedirs(save_dir)
+        for i, frame in enumerate(frames):
+            frame.save(os.path.join(save_dir, f"frame_{i:04d}.png"))
+
+        return frames, is_clear
+
+    def score_frames(self, frames, is_clear):
+        """이미지 프레임 리스트를 받아 LLM 점수를 반환 (현재는 -1 고정)"""
+        return -1
+
+    def llmscore(self, info, map_name="map"):
+        frames, is_clear = self.render_solution(info, map_name=map_name)
+        score = self.score_frames(frames, is_clear)
+        return score, is_clear
+

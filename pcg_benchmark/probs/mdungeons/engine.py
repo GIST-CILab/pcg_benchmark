@@ -357,3 +357,81 @@ class State:
                         result += " "
             result += "\n"
         return result[:-1]
+
+class TreasureCollectorState(State):
+    """
+    Treasure Collector persona:
+    - 가능한 한 모든 보물(T)과 적(M)을 수집/처치한 뒤 출구 도달
+    - 보물/적이 남아있으면 문 도착을 승리로 인정하지 않고 계속 탐색
+    휴리스틱:
+      - 남은 보물 수 × (W+H) × 3  → 보물 최대 수집 강제
+      - 남은 적 수   × (W+H) × 2  → 적 처치 장려
+      - 문까지 맨해튼 거리          → 최단 경로
+      - 체력 패널티 완화            → 적과 싸우는 걸 감수
+    """
+    def getHeuristic(self):
+        playerDist = abs(self.player["x"] - self.door["x"]) + abs(self.player["y"] - self.door["y"])
+        remaining_treasures = len(self.treasures)
+        remaining_enemies   = len(self.enemies)
+        healthCost = max(0, 5 - self.player["health"])
+        return (remaining_treasures * (self.width + self.height) * 3 +
+                remaining_enemies   * (self.width + self.height) * 2 +
+                playerDist +
+                healthCost * 4 +
+                self.width * self.height)
+
+    def update(self, dirX, dirY):
+        if self.checkOver():
+            return ""
+        if abs(dirX) > 0 and abs(dirY) > 0:
+            return ""
+        if dirX > 0: dirX = 1
+        if dirX < 0: dirX = -1
+        if dirY > 0: dirY = 1
+        if dirY < 0: dirY = -1
+        newX = self.player["x"] + dirX
+        newY = self.player["y"] + dirY
+        if self.checkMovableLocation(newX, newY):
+            # 보물/적이 남아있으면 출구는 통과 불가 (모두 수집 후에만 도달 가능)
+            if (len(self.treasures) > 0 or len(self.enemies) > 0):
+                if self.door and newX == self.door["x"] and newY == self.door["y"]:
+                    return ""
+            return self.updatePlayer(newX, newY)
+        return ""
+
+    def getKey(self):
+        # 남은 보물/적 상태까지 key에 포함 → 같은 위치라도 수집 상태가 다르면 재탐색 허용
+        key = str(self.player["x"]) + "," + str(self.player["y"]) + "," + str(self.player["health"]) + "|"
+        key += str(self.door["x"]) + "," + str(self.door["y"]) + "|"
+        for p in self.potions:
+            key += str(p["x"]) + "," + str(p["y"]) + ","
+        key += "|"
+        for t in self.treasures:
+            key += str(t["x"]) + "," + str(t["y"]) + ","
+        key += "|"
+        for e in self.enemies:
+            key += str(e["x"]) + "," + str(e["y"]) + ","
+        return key
+
+    def checkWin(self):
+        # 보물과 적이 모두 사라진 후에 문에 도착해야 승리
+        at_door = self.player["x"] == self.door["x"] and self.player["y"] == self.door["y"]
+        all_collected = len(self.treasures) == 0 and len(self.enemies) == 0
+        return at_door and all_collected
+
+    def clone(self):
+        clone = TreasureCollectorState()
+        clone.width  = self.width
+        clone.height = self.height
+        clone.solid  = self.solid
+        clone.player = {"x": self.player["x"], "y": self.player["y"],
+                        "health": self.player["health"], "potions": self.player["potions"],
+                        "treasures": self.player["treasures"], "enemies": self.player["enemies"]}
+        clone.door = self.door
+        for p in self.potions:
+            clone.potions.append(p)
+        for t in self.treasures:
+            clone.treasures.append(t)
+        for e in self.enemies:
+            clone.enemies.append(e)
+        return clone

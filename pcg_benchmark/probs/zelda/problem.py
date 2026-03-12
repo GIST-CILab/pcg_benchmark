@@ -5,6 +5,24 @@ from difflib import SequenceMatcher
 import numpy as np
 from PIL import Image
 import os
+import shutil
+
+def load_level(filepath):
+    """
+    zelda 레퍼런스 맵 파일을 읽어 content numpy 배열로 변환.
+    w->0(wall), .->1(empty), @->2(player), +->3(key), g->4(door), e->5(enemy)
+    """
+    char_map = {'w': 0, '.': 1, '@': 2, '+': 3, 'g': 4, 'e': 5}
+    with open(filepath, 'r') as f:
+        lines = f.read().splitlines()
+    lines = [l for l in lines if l.strip() != '']
+    height = len(lines)
+    width = max(len(l) for l in lines)
+    arr = np.zeros((height, width), dtype=int)
+    for y, line in enumerate(lines):
+        for x, ch in enumerate(line):
+            arr[y][x] = char_map.get(ch, 1)
+    return arr
 
 class ZeldaProblem(Problem):
     def __init__(self, **kwargs):
@@ -34,13 +52,14 @@ class ZeldaProblem(Problem):
         player_key = get_distance_length(content, [2], [3], [1, 2, 3, 5])
         pk_path = get_path(content, [2], [3], [1, 2, 3, 5])
         key_door = get_distance_length(content, [3], [4], [1, 2, 3, 4, 5])
-        kd_path = get_path(content, [3], [4], [1, 2, 3, 5])
+        kd_path = get_path(content, [3], [4], [1, 2, 3, 4, 5])
 
         return {
-            "regions": number_regions, "players": number_player, 
+            "regions": number_regions, "players": number_player,
             "keys": number_key, "doors": number_door, "enemies": number_enemies,
             "player_key": player_key, "key_door": key_door,
             "pk_path": pk_path, "kd_path": kd_path,
+            "content": content,
         }
 
     def quality(self, info):
@@ -110,3 +129,73 @@ class ZeldaProblem(Problem):
             for x in range(lvl.shape[1]):
                 lvl_image.paste(graphics[lvl[y][x]], (x*scale, y*scale, (x+1)*scale, (y+1)*scale))
         return lvl_image
+
+    def render_solution(self, info, map_name="map"):
+        """pk_path + kd_path를 따라 맵 상태를 동적으로 렌더링한 프레임 리스트를 생성하고 저장"""
+        pk_path = info.get("pk_path", [])
+        kd_path = info.get("kd_path", [])
+        is_clear = info.get("player_key", 0) > 0 and info.get("key_door", 0) > 0
+
+        if len(pk_path) == 0 and len(kd_path) == 0:
+            return [], is_clear
+
+        scale = 16
+        content = np.array(info["content"], dtype=int)
+        img_dir = os.path.dirname(__file__) + "/images/"
+        graphics = [
+            Image.open(img_dir + "solid.png").convert('RGBA'),
+            Image.open(img_dir + "empty.png").convert('RGBA'),
+            Image.open(img_dir + "player.png").convert('RGBA'),
+            Image.open(img_dir + "key.png").convert('RGBA'),
+            Image.open(img_dir + "door.png").convert('RGBA'),
+            Image.open(img_dir + "bat.png").convert('RGBA'),
+        ]
+
+        def _render_map(lvl):
+            padded = np.pad(lvl, 1)
+            img = Image.new("RGBA", (padded.shape[1] * scale, padded.shape[0] * scale), (0, 0, 0, 255))
+            for y in range(padded.shape[0]):
+                for x in range(padded.shape[1]):
+                    img.paste(graphics[padded[y][x]], (x * scale, y * scale, (x + 1) * scale, (y + 1) * scale))
+            return img
+
+        # 원본에서 플레이어(2) 제거한 베이스 맵 (플레이어 위치는 매 프레임 동적으로 추가)
+        base = content.copy()
+        base[base == 2] = 1  # 원본 플레이어 위치를 빈칸으로
+
+        frames = []
+
+        # --- pk_path: 키가 있는 상태에서 플레이어 이동 ---
+        for (x, y) in pk_path:
+            state = base.copy()
+            state[y][x] = 2
+            frames.append(_render_map(state))
+
+        # 키 획득: 키(3) → 빈칸(1)
+        base[base == 3] = 1
+
+        # --- kd_path: 키 사라진 상태에서 문까지 이동 ---
+        for (x, y) in kd_path:
+            state = base.copy()
+            state[y][x] = 2
+            frames.append(_render_map(state))
+
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        save_dir = os.path.join(project_root, "videos", "zelda", map_name)
+        if os.path.exists(save_dir):
+            shutil.rmtree(save_dir)
+        os.makedirs(save_dir)
+        for i, frame in enumerate(frames):
+            frame.save(os.path.join(save_dir, f"frame_{i:04d}.png"))
+
+        return frames, is_clear
+
+    def score_frames(self, frames, is_clear):
+        """이미지 프레임 리스트를 받아 LLM 점수를 반환 (현재는 -1 고정)"""
+        return -1
+
+    def llmscore(self, info, map_name="map"):
+        frames, is_clear = self.render_solution(info, map_name=map_name)
+        score = self.score_frames(frames, is_clear)
+        return score, is_clear
+

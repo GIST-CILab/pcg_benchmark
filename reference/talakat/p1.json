@@ -1,0 +1,185 @@
+{
+    "spawners": {
+        "spawner_0": {
+            "pattern": [
+                "bullet"
+            ],
+            "patternTime": "5",
+            "patternRepeat": "0",
+            "spawnerPhase": "280",
+            "spawnerRadius": "80"
+        },
+        "spawner_1": {
+            "pattern": [
+                "wait"
+            ],
+            "patternTime": "2",
+            "patternRepeat": "0",
+            "spawnerPhase": "270",
+            "spawnerRadius": "0"
+        },
+        "spawner_2": {
+            "pattern": [
+                "bullet"
+            ],
+            "patternTime": "6",
+            "patternRepeat": "0",
+            "spawnerPhase": "90, 270, 4, 6, circle",
+            "spawnerRadius": "0",
+            "spawnedNumber": "2",
+            "spawnedAngle": "200",
+            "spawnedSpeed": "2",
+            "bulletRadius": "18, 22, -5, 5, reverse"
+        },
+        "spawner_3": {
+            "pattern": [
+                "spawner_6",
+                "spawner_0"
+            ],
+            "patternTime": "3",
+            "patternRepeat": "3"
+        },
+        "spawner_4": {
+            "pattern": [
+                "bullet"
+            ],
+            "patternTime": "4",
+            "patternRepeat": "0",
+            "spawnerPhase": "110",
+            "spawnerRadius": "40"
+        },
+        "spawner_5": {
+            "pattern": [
+                "spawner_9",
+                "bullet"
+            ],
+            "patternTime": "5",
+            "patternRepeat": "0",
+            "spawnerPhase": "30",
+            "spawnerRadius": "80",
+            "spawnedNumber": "3, 4, -0.4, 5, circle",
+            "spawnedAngle": "290",
+            "spawnedSpeed": "4",
+            "bulletRadius": "10"
+        },
+        "spawner_6": {
+            "pattern": [
+                "bullet"
+            ],
+            "patternTime": "3",
+            "patternRepeat": "1",
+            "spawnerPhase": "150",
+            "spawnerRadius": "20, 35, 1, 6, circle",
+            "spawnedNumber": "2, 6, -0.5, 4, reverse",
+            "spawnedAngle": "10, 340, -2, 2, circle",
+            "spawnedSpeed": "3, 4, 0.9, 3, reverse",
+            "bulletRadius": "18"
+        },
+        "spawner_7": {
+            "pattern": [
+                "spawner_8",
+                "spawner_2",
+                "bullet",
+                "bullet"
+            ],
+            "patternTime": "4",
+            "patternRepeat": "0"
+        },
+        "spawner_8": {
+            "pattern": [
+                "bullet"
+            ],
+            "patternTime": "3",
+            "patternRepeat": "0",
+            "spawnerPhase": "300",
+            "spawnerRadius": "0, 35, 3, 3, circle",
+            "spawnedNumber": "3, 5, 0.4, 6, reverse",
+            "spawnedAngle": "240",
+            "spawnedSpeed": "3, 6, 0.4, 2, reverse",
+            "bulletRadius": "10, 30, 2, 6, circle"
+        },
+        "spawner_9": {
+            "pattern": [
+                "bullet"
+            ],
+            "patternTime": "6",
+            "patternRepeat": "2",
+            "spawnerPhase": "40",
+            "spawnerRadius": "0",
+            "spawnedNumber": "4",
+            "spawnedAngle": "210",
+            "spawnedSpeed": "1, 6, 0.3, 4, reverse",
+            "bulletRadius": "14, 24, 3, 6, circle"
+        }
+    },
+    "boss": {
+        "script": [
+            {
+                "health": "1",
+                "events": [
+                    "spawn, spawner_6, 0, 180"
+                ]
+            },
+            {
+                "health": "0.9",
+                "events": [
+                    "spawn, spawner_5"
+                ]
+            },
+            {
+                "health": "0.8",
+                "events": [
+                    "spawn, spawner_1, 0, 280"
+                ]
+            },
+            {
+                "health": "0.7",
+                "events": [
+                    "spawn, spawner_6, 40, 120"
+                ]
+            },
+            {
+                "health": "0.6",
+                "events": [
+                    "spawn, spawner_6, 0, 180",
+                    "spawn, spawner_3, 20, 200, 4, 140"
+                ]
+            },
+            {
+                "health": "0.5",
+                "events": [
+                    "spawn, spawner_9, 40, 200, 1, 110",
+                    "spawn, spawner_0",
+                    "spawn, spawner_4, 0, 220, 4, 30"
+                ]
+            },
+            {
+                "health": "0.4",
+                "events": [
+                    "spawn, spawner_1, 0, 280"
+                ]
+            },
+            {
+                "health": "0.3",
+                "events": [
+                    "spawn, spawner_6, 40, 120"
+                ]
+            },
+            {
+                "health": "0.2",
+                "events": [
+                    "spawn, spawner_6, 0, 180",
+                    "spawn, spawner_3, 20, 200, 4, 140"
+                ]
+            },
+            {
+                "health": "0.1",
+                "events": [
+                    "spawn, spawner_9, 40, 200, 1, 110",
+                    "spawn, spawner_0",
+                    "spawn, spawner_4, 0, 220, 4, 30"
+                ]
+            }
+        ]
+    }
+}
